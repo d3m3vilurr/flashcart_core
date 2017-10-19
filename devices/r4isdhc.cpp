@@ -46,6 +46,29 @@ namespace {
         ioDelay(0x60000);
     }
 
+    uint32_t nor68Cmd(const char a1, const char a2, const char a3, uint32_t a4, uint16_t a5) {
+        CmdBuf4 buf;
+        uint8_t cmd[8];
+        cmd[0] = 0x68;
+        cmd[1] = (a2 & 0xF) | (a1 << 4);
+        cmd[2] = a3;
+        cmd[3] = a4 >> 16;
+        cmd[4] = a4 >> 8;
+        cmd[5] = a4;
+        cmd[6] = a5 >> 8;
+        cmd[7] = a5;
+        sendCommand(cmd, 4, buf.u8, 0x180000);
+        logMessage(LOG_DEBUG, "R4ISDHC: NOR 68 at %X returned %X", a4, buf.u32);
+        return buf.u32;
+    }
+
+    uint32_t norRawCmd(const char outlen, const char inlen, const char cmd, const uint32_t addr, const uint16_t d) {
+        CmdBuf4 buf;
+        sendCommand(norCmd(outlen, inlen, cmd, addr, d >> 8, d), 4, buf.u8, 0x180000);
+        logMessage(LOG_DEBUG, "R4ISDHC: NOR %X at %X returned %X", cmd, addr, buf.u32);
+        return buf.u32;
+    }
+
     void norErase4k(const uint32_t address) {
         norWriteEnable();
         sendCommand(norCmd(0, 4, 0x20, address), 4, nullptr, 0x180000);
@@ -216,6 +239,108 @@ public:
             " * R4i-SDHC B9S (r4i-sdhc.com)";
     }
 
+    uint8_t sub_20602468(const int addr, const int len, const uint8_t *buf) {
+        uint8_t unk_u8[] = {
+            0x8B, 0x2C, 0xBC, 0xD4, 0x32, 0x12, 0xEB, 0xBC,
+            0x64, 0x84, 0xEC, 0xBF, 0xB9, 0x0F, 0xDB, 0x35,
+            0x91, 0x8F, 0x40, 0xAB, 0x51, 0x89, 0xF8, 0x7F,
+            0x4E, 0xAA, 0xF7, 0x48, 0xA2, 0x1F, 0x70, 0x1E,
+        };
+
+        // p should be 0, but orig code not check this
+        uint32_t idx = nor68Cmd(unk_u8[22], unk_u8[23], unk_u8[24], unk_u8[25], unk_u8[26]);
+        uint32_t *p = (uint32_t*)&buf[idx];
+        for (int a = addr; a <= addr + len; a++, p++) {
+            *p = norRawCmd(unk_u8[27], unk_u8[28], unk_u8[29], a, unk_u8[30]);
+        }
+        return 1;
+    }
+
+    uint8_t sub_20602630() {
+        sendCommand(0x68, 4, nullptr, 0x180000);
+
+        // step1.
+        // sub_20602554
+        // ret unknown addr?
+        uint32_t v0 = norRead(0x7084);
+        if ((v0 & 0xFF) != 0x32) {
+            return 2;
+        }
+
+        // step2.
+        uint32_t v22[7];
+        v22[1] = 0x3BE32FA2;
+        uint32_t v0_l = 0x02FE5462;
+        uint32_t v0_h = 0x3BE32FA2 - 0x4700F435;
+        v22[2] = 0xFC7C33B6;
+        v22[3] = 0xE191AA40;
+        v22[4] = 0x71F28D1D;
+        v22[0] = 0xFFFF0030;
+        *(uint64_t*)&v22[5] = ((uint64_t)(v0_h) << 32) | v0_l;
+
+        uint8_t unk_v28[104];
+        v0 = sub_20602468(0x2F00, 8, unk_v28);
+
+        uint32_t v1 = 0;
+        uint8_t *v2 = unk_v28;
+        uint8_t v3 = 0xA2;
+        uint8_t *v4 = (uint8_t*)&v22[1];
+
+        for (int i = 0; i < 8; i++) {
+             if (v2[i] == v3) {
+                 v1 = 1;
+             }
+             v3 = (v4++)[1];
+        }
+        if (!v1) {
+            return 1;
+        }
+
+        // step3.
+        uint8_t v9 = 0x40;
+        uint8_t *v10 = (uint8_t*)&v22[3];
+        v1 = 0;
+
+        for (int i = 0; i < 8; i++) {
+             if (v2[i] != v9) {
+                 v1 = 1;
+             }
+             v9 = (v10++)[1];
+        }
+        if (v1) {
+            return 2;
+        }
+
+        // step4.
+        sub_20602468(0x3000, 0x80, unk_v28);
+        uint8_t v13 = 0x30;
+        uint8_t *v14 = (uint8_t*)&v22[0];
+        for (int i = 0; i < 4; i++) {
+            if (v14[i] != v13) {
+                v1 = 1;
+            }
+
+        }
+        if (v1) {
+            return 2;
+        }
+
+        // step5.
+        uint8_t v16 = 0x62;
+        uint8_t *v17 = &unk_v28[95];
+        uint8_t *v18 = (uint8_t*)&v22[5];
+        for (int i = 0; i < 8; i++) {
+             if (v17[i] != v16) {
+                 v1 = 1;
+             }
+             v16 = (v18++)[1];
+        }
+        if (v1 == 1) {
+            return 2;
+        }
+        return 0;
+    }
+
     bool initialize() {
         CmdBuf4 buf;
         // this is actually the NOR write disable command
@@ -226,23 +351,22 @@ public:
             return false;
         }
 
-        ntrcard::init();
-        sendCommand(0x68, 4, nullptr, 0x180000);
+        //ntrcard::init();
+
+        // type is 0~2
+        uint8_t type = sub_20602630();
+        if (type == 2) {
+            return false;
+        }
+
         // now it will return zeroes
         sendCommand(0x40199, 4, buf.u8, 0x180000);
         if (buf.u32 == 0) {
             return true;
         }
 
-        // ok, we go the hard way
-        if (trySecureInit(BlowfishKey::NTR)
-            || trySecureInit(BlowfishKey::B9RETAIL)
-            || trySecureInit(BlowfishKey::B9DEV)) {
-            old_cart = true;
-            return true;
-        }
-
-        return false;
+        old_cart = true;
+        return true;
     }
 
     void shutdown() { }
