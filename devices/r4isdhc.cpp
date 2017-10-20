@@ -230,10 +230,11 @@ public:
         // the r4isdhc will respond to cart commands with 0xFFFFFFFF if
         // the "magic" command hasn't been sent, so we check for that
         sendCommand(0x40199, 4, buf.u8, 0x180000);
-        // NDS will return 0, but 3DS will return 0xFFFFFFFF
+        // 3DS will return 0xFFFFFFFF
+        // NDS: old cart return 0, new cart looks return corrupted value
         if (buf.u32 != 0xFFFFFFFF && buf.u32 != 0) {
             logMessage(LOG_DEBUG, "step 0: %X", buf.u32);
-            return false;
+            // return false;
         }
 
         if (!platform::FORCE_BYPASS_INIT_BLOWFISH) {
