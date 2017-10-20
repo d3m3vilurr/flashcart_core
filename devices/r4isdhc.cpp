@@ -177,20 +177,28 @@ namespace {
             uint8_t bytes[4];
         } buf;
 
-        ntrcard::init();
-        ntrcard::state.hdr_key1_romcnt = ntrcard::state.key1_romcnt = 0x81808F8;
-        ntrcard::state.hdr_key2_romcnt = ntrcard::state.key2_romcnt = 0x416657;
-        ntrcard::state.key2_seed = 0;
-        if (!ntrcard::initKey1(key)) {
-            logMessage(LOG_ERR, "r4isdhc: init key1 (key = %d) failed", static_cast<int>(key));
-            return false;
-        }
-        if (!ntrcard::initKey2()) {
-            logMessage(LOG_ERR, "r4isdhc: init key2 failed");
-            return false;
+        if (!platform::FORCE_BYPASS_INIT_BLOWFISH) {
+            ntrcard::init();
+            ntrcard::state.hdr_key1_romcnt = ntrcard::state.key1_romcnt = 0x81808F8;
+            ntrcard::state.hdr_key2_romcnt = ntrcard::state.key2_romcnt = 0x416657;
+            ntrcard::state.key2_seed = 0;
+            if (!ntrcard::initKey1(key)) {
+                logMessage(LOG_ERR, "r4isdhc: init key1 (key = %d) failed", static_cast<int>(key));
+                return false;
+            }
+            if (!ntrcard::initKey2()) {
+                logMessage(LOG_ERR, "r4isdhc: init key2 failed");
+                return false;
+            }
         }
         sendCommand(0x66, 4, nullptr, 0x586000);
+        platform::disableSecureFlags();
         sendCommand(0x40199, 4, buf.bytes, 0x180000);
+        bool ret = buf.u32 != 0xFFFFFFFF;
+        if (!ret) {
+            logMessage(LOG_DEBUG, "step 2(%X): %X", key, buf.u32);
+            platform::enableSecureFlags();
+        }
         return buf.u32 != 0xFFFFFFFF;
     }
 }
@@ -223,16 +231,21 @@ public:
         // the "magic" command hasn't been sent, so we check for that
         sendCommand(0x40199, 4, buf.u8, 0x180000);
         if (buf.u32 != 0xFFFFFFFF) {
+            logMessage(LOG_DEBUG, "step 0: %X", buf.u32);
             return false;
         }
 
         ntrcard::init();
         sendCommand(0x68, 4, nullptr, 0x180000);
+
+        platform::disableSecureFlags();
         // now it will return zeroes
         sendCommand(0x40199, 4, buf.u8, 0x180000);
         if (buf.u32 == 0) {
+            logMessage(LOG_DEBUG, "step 1: %X", buf.u32);
             return true;
         }
+        platform::enableSecureFlags();
 
         // ok, we go the hard way
         if (trySecureInit(BlowfishKey::NTR)
@@ -245,7 +258,9 @@ public:
         return false;
     }
 
-    void shutdown() { }
+    void shutdown() {
+        platform::enableSecureFlags();
+    }
 
     bool readFlash(const uint32_t address, const uint32_t length, uint8_t *const buffer) override {
         return readNor(address, length, buffer, true);

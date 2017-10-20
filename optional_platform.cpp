@@ -14,5 +14,9 @@ __attribute__((weak)) int logMessage(log_priority priority, const char *fmt, ...
 __attribute__((weak)) extern const bool HAS_HW_KEY2 = false;
 
 __attribute__((weak)) void initKey2Seed(std::uint64_t x, std::uint64_t y) {}
+
+__attribute__((weak)) void enableSecureFlags() {}
+
+__attribute__((weak)) void disableSecureFlags() {}
 }
 }
