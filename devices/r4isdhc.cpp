@@ -256,7 +256,7 @@ public:
         return 1;
     }
 
-    uint8_t sub_20602630() {
+    uint8_t getFlashCartType() {
         sendCommand(0x68, 4, nullptr, 0x180000);
 
         // step1.
@@ -267,77 +267,36 @@ public:
             return 2;
         }
 
-        // step2.
-        uint32_t v22[7];
-        v22[1] = 0x3BE32FA2;
-        uint32_t v0_l = 0x02FE5462;
-        uint32_t v0_h = 0x3BE32FA2 - 0x4700F435;
-        v22[2] = 0xFC7C33B6;
-        v22[3] = 0xE191AA40;
-        v22[4] = 0x71F28D1D;
-        v22[0] = 0xFFFF0030;
-        *(uint64_t*)&v22[5] = ((uint64_t)(v0_h) << 32) | v0_l;
-
         uint8_t unk_v28[104];
         v0 = sub_20602468(0x2F00, 8, unk_v28);
 
-        uint32_t v1 = 0;
-        uint8_t *v2 = unk_v28;
-        uint8_t v3 = 0xA2;
-        uint8_t *v4 = (uint8_t*)&v22[1];
+        uint8_t verify[] = {
+            0x30, 0x00, 0xFF, 0xFF,
+            0xA2, 0x2F, 0xE3, 0x3B,
+            0xB6, 0x33, 0x7C, 0xFC,
+            0x40, 0xAA, 0x91, 0xE1,
+            0x1D, 0x8D, 0xF2, 0x71,
+            0x62, 0x54, 0xFE, 0x02,
+            0x6D, 0x3B, 0xE2, 0xF4, // 0x3BE32FA2 - 0x4700F435
+        };
 
-        for (int i = 0; i < 8; i++) {
-             if (v2[i] == v3) {
-                 v1 = 1;
-             }
-             v3 = (v4++)[1];
-        }
-        if (!v1) {
+        if (memcmp(unk_v28, verify + 4, 8) == 0) {
             return 1;
         }
-
-        // step3.
-        uint8_t v9 = 0x40;
-        uint8_t *v10 = (uint8_t*)&v22[3];
-        v1 = 0;
-
-        for (int i = 0; i < 8; i++) {
-             if (v2[i] != v9) {
-                 v1 = 1;
-             }
-             v9 = (v10++)[1];
-        }
-        if (v1) {
+        if (memcmp(unk_v28, verify + 12, 8) != 0) {
             return 2;
         }
 
-        // step4.
         sub_20602468(0x3000, 0x80, unk_v28);
-        uint8_t v13 = 0x30;
-        uint8_t *v14 = (uint8_t*)&v22[0];
-        for (int i = 0; i < 4; i++) {
-            if (v14[i] != v13) {
-                v1 = 1;
-            }
 
-        }
-        if (v1) {
+        if (memcmp(unk_v28, verify, 16) != 0) {
             return 2;
         }
 
-        // step5.
-        uint8_t v16 = 0x62;
-        uint8_t *v17 = &unk_v28[95];
-        uint8_t *v18 = (uint8_t*)&v22[5];
-        for (int i = 0; i < 8; i++) {
-             if (v17[i] != v16) {
-                 v1 = 1;
-             }
-             v16 = (v18++)[1];
-        }
-        if (v1 == 1) {
+        if (memcmp(unk_v28 + 96, verify + 20, 8) != 0) {
             return 2;
         }
+
         return 0;
     }
 
@@ -351,21 +310,20 @@ public:
             return false;
         }
 
-        //ntrcard::init();
-
         // type is 0~2
-        uint8_t type = sub_20602630();
+        uint8_t type = getFlashCartType();
+        logMessage(LOG_DEBUG, "R4ISDHC: Flash cart type %X", type);
+
         if (type == 2) {
             return false;
         }
 
         // now it will return zeroes
         sendCommand(0x40199, 4, buf.u8, 0x180000);
-        if (buf.u32 == 0) {
-            return true;
+        if (buf.u32 != 0) {
+            old_cart = true;
         }
 
-        old_cart = true;
         return true;
     }
 
