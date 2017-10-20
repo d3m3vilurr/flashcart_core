@@ -247,10 +247,15 @@ public:
             0x4E, 0xAA, 0xF7, 0x48, 0xA2, 0x1F, 0x70, 0x1E,
         };
 
-        // p should be 0, but orig code not check this
+        // idx should be 0, but orig code not check this
         uint32_t idx = nor68Cmd(unk_u8[22], unk_u8[23], unk_u8[24], unk_u8[25], unk_u8[26]);
+
+        if (idx >= 0x60) {
+            logMessage(LOG_ERR, "R4ISDHC: warn sub_20602468 index overflow %X", idx);
+            idx = 0;
+        }
         uint32_t *p = (uint32_t*)&buf[idx];
-        for (int a = addr; a <= addr + len; a++, p++) {
+        for (int a = addr; a < addr + len; a += 4, p++) {
             *p = norRawCmd(unk_u8[27], unk_u8[28], unk_u8[29], a, unk_u8[30]);
         }
         return 1;
@@ -264,6 +269,7 @@ public:
         // ret unknown addr?
         uint32_t v0 = norRead(0x7084);
         if ((v0 & 0xFF) != 0x32) {
+            logMessage(LOG_DEBUG, "R4ISDHC: exit getFlashCartType - step 0");
             return 2;
         }
 
@@ -281,22 +287,27 @@ public:
         };
 
         if (memcmp(unk_v28, verify + 4, 8) == 0) {
+            logMessage(LOG_DEBUG, "R4ISDHC: exit getFlashCartType - step 1");
             return 1;
         }
         if (memcmp(unk_v28, verify + 12, 8) != 0) {
+            logMessage(LOG_DEBUG, "R4ISDHC: exit getFlashCartType - step 2");
             return 2;
         }
 
         sub_20602468(0x3000, 0x80, unk_v28);
 
         if (memcmp(unk_v28, verify, 16) != 0) {
+            logMessage(LOG_DEBUG, "R4ISDHC: exit getFlashCartType - step 3");
             return 2;
         }
 
         if (memcmp(unk_v28 + 96, verify + 20, 8) != 0) {
+            logMessage(LOG_DEBUG, "R4ISDHC: exit getFlashCartType - step 4");
             return 2;
         }
 
+        logMessage(LOG_DEBUG, "R4ISDHC: exit getFlashCartType - step 5");
         return 0;
     }
 
@@ -324,6 +335,7 @@ public:
             old_cart = true;
         }
 
+        logMessage(LOG_DEBUG, "R4ISDHC: Flash cart is %s", old_cart ? "old" : "new");
         return true;
     }
 
