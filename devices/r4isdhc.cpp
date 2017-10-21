@@ -231,10 +231,10 @@ public:
         // the "magic" command hasn't been sent, so we check for that
         sendCommand(0x40199, 4, buf.u8, 0x180000);
         // 3DS will return 0xFFFFFFFF
-        // NDS: old cart return 0, new cart looks return corrupted value
-        if (buf.u32 != 0xFFFFFFFF && buf.u32 != 0) {
+        // NDS: new cart looks return corrupted value
+        if (buf.u32 != 0xFFFFFFFF && buf.u32 == 0) {
             logMessage(LOG_DEBUG, "step 0: %X", buf.u32);
-            // return false;
+            return false;
         }
 
         if (!platform::FORCE_BYPASS_INIT_BLOWFISH) {
