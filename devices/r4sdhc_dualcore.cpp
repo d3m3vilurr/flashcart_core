@@ -34,6 +34,12 @@ private:
         return dec;
     }
 
+    void encrypt_memcpy(uint8_t *dst, uint8_t *src, uint32_t length)
+    {
+        for(int i = 0; i < (int)length; ++i)
+            dst[i] = encrypt(src[i]);
+    }
+
     uint8_t encrypt(uint8_t dec) {
         uint8_t enc = 0;
         if (dec & BIT(0)) enc |= BIT(6); // 64
@@ -126,8 +132,28 @@ public:
 
     // Need to find offsets first.
     bool injectNtrBoot(uint8_t *blowfish_key, uint8_t *firm, uint32_t firm_size) {
-        logMessage(LOG_ERR, "R4SDHC: ntrboot injection not implemented!");
-        return false;
+        unlock_cart();
+        const uint32_t blowfish_adr = 0x10000;
+        const uint32_t firm_hdr_adr = 0x1BE00;
+        const uint32_t firm_adr = 0x1C0000;
+
+        logMessage(LOG_INFO, "R4iGold: Injecting ntrboot");
+        uint8_t *chunk0 = (uint8_t *)malloc(0x10000);
+        readFlash(blowfish_adr, 0x10000, chunk0);
+        encrypt_memcpy(chunk0, blowfish_key, 0x1048);
+        encrypt_memcpy(chunk0 + firm_hdr_adr, firm, 0x200);
+        writeFlash(blowfish_adr, 0x10000, chunk0);
+        free(chunk0);
+
+        uint32_t buf_size = PAGE_ROUND_UP(firm_size - 0x200, 0x10000);
+        uint8_t *firm_chunk = (uint8_t *)malloc(buf_size);
+        readFlash(firm_adr, buf_size, firm_chunk);
+        encrypt_memcpy(firm_chunk, firm + 0x200, firm_size);
+        writeFlash(firm_adr, buf_size, firm_chunk);
+
+        free(firm_chunk);
+
+        return true;
     }
 };
 
@@ -138,6 +164,7 @@ const uint8_t R4SDHC_DualCore::cmdCartVersion[8] = {0xC5, 0x00, 0x00, 0x00, 0x00
 const uint8_t R4SDHC_DualCore::cmdUnkD0AA[8] = {0xD0, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 const uint8_t R4SDHC_DualCore::cmdUnkD0[8] = {0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+//const uint8_t R4SDHC_DualCore::cmdReadFlash[8] = {0xB7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 const uint8_t R4SDHC_DualCore::cmdEraseFlash[8] = {0xD4, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00};
 const uint8_t R4SDHC_DualCore::cmdWriteByteFlash[8] = {0xD4, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00};
 
