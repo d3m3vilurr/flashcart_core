@@ -16,7 +16,7 @@ private:
     static const uint8_t cmdWriteByteFlash[8];
 
     static const uint8_t cmdUnkC0[8];
-    static const uint8_t cmdUnkC5[8];
+    static const uint8_t cmdCartVersion[8];
     static const uint8_t cmdUnkD0AA[8];
     static const uint8_t cmdUnkD0[8];
 
@@ -48,39 +48,24 @@ private:
         return enc;
     }
 
-    uint32_t readCartVersion() {
-        // send c5
-        memset(buf, 0, 6);
-        bool ret;
-
-        uint32_t x = ((c5 << 8) & 0xF00) | ((c5 >> 8) & 0xFF);
-        buf[0] = 0x56; // V
-        buf[1] = (x >> 4) & 0xFF;
-        buf[2] = 0x2E; // .
-        buf[3] = (x >> 4) & 0xFF;
-        buf[4] = x & 0x0F;
-        buf[5] = 0x00; // string end
-        ret = false;
-        if (buf[1] <= 9 && buf[3] <= 9 && buf[4] <= 9) {
-            buf[1] += 0x30;
-            buf[3] += 0x30;
-            buf[4] += 0x30;
-            ret = true;
-        }
+    uint16_t read_cart_version() {
+        uint32_t version;
+        sendCommand(cmdCartVersion, 4, (uint8_t*)(&version), 0x50);
+        uint16_t ret = ((version << 8) & 0xFF00) | ((version >> 8) & 0xFF);
+        logMessage(LOG_DEBUG, "R4SDHC: C5 %X(%X)", ret, version);
         return ret;
     }
 
-    bool unlockCart() {
-        // send D0AA
-        // send D000
-        // send D0AA
+    bool unlock_cart() {
+        uint32_t dummy;
+        sendCommand(cmdUnkD0AA, 4, (uint8_t*)&dummy, 0x50);
+        logMessage(LOG_DEBUG, "R4SDHC: D0AA %X", dummy);
+        sendCommand(cmdUnkD0, 0, nullptr, 0x50);
+        sendCommand(cmdUnkD0AA, 4, (uint8_t*)&dummy, 0x50);
+        logMessage(LOG_DEBUG, "R4SDHC: D0AA %X", dummy);
     }
 
     void erase_cmd(uint32_t address) {
-        // send D0..10
-        // block 0x10000 bytes
-        //
-        // block end is 0x200000
         uint8_t cmdbuf[8];
         logMessage(LOG_DEBUG, "R4SDHC: erase(0x%08x)", address);
         memcpy(cmdbuf, cmdEraseFlash, 8);
@@ -88,12 +73,11 @@ private:
         cmdbuf[2] = (address >>  8) & 0xFF;
         cmdbuf[3] = (address >>  0) & 0xFF;
 
-        sendCommand(cmdbuf, 0, nullptr); // TODO: find IDB and get the latencies.
+        // TODO: find IDB and get the latencies.
+        sendCommand(cmdbuf, 0, nullptr, 0x50);
     }
 
     void write_cmd(uint32_t address, uint8_t value) {
-        // send d4..30
-        // need encrypt?
         uint8_t cmdbuf[8];
         logMessage(LOG_DEBUG, "R4SDHC: write(0x%08x) = 0x%02x", address, value);
         memcpy(cmdbuf, cmdWriteByteFlash, 8);
@@ -106,19 +90,16 @@ private:
     }
 
 public:
-    R4SDHC_DualCore() : Flashcart("R4 SDHC Dual Core", 0x400000) { }
+    R4SDHC_DualCore() : Flashcart("R4 SDHC Dual Core", 0x200000) { }
 
     bool initialize() {
-        uint8_t dummy[4];
+        //uint8_t dummy[4];
 
         logMessage(LOG_INFO, "R4SDHC: Init");
-        sendCommand(cmdUnkD0AA, 4, dummy);
-        sendCommand(cmdUnkD0, 0, nullptr);
-        sendCommand(cmdUnkD0AA, 4, dummy);
-        sendCommand(cmdUnkD0AA, 4, dummy);
 
-        logMessage(LOG_WARN, "R4SDHC: We have no way of detecting cart!");
-        return true; // We have no way of checking yet.
+        uint16_t version = read_cart_version();
+        // TODO check version
+        return false;
     }
     void shutdown() {
         logMessage(LOG_INFO, "R4SDHC: Shutdown");
