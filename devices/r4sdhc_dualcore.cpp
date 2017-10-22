@@ -15,6 +15,8 @@ private:
     static const uint8_t cmdEraseFlash[8];
     static const uint8_t cmdWriteByteFlash[8];
 
+    static const uint8_t cmdUnkC0[8];
+    static const uint8_t cmdUnkC5[8];
     static const uint8_t cmdUnkD0AA[8];
     static const uint8_t cmdUnkD0[8];
 
@@ -34,19 +36,51 @@ private:
 
     uint8_t encrypt(uint8_t dec) {
         uint8_t enc = 0;
-        if (dec & BIT(0)) enc |= BIT(5);
-        if (dec & BIT(1)) enc |= BIT(4);
-        if (dec & BIT(2)) enc |= BIT(1);
-        if (dec & BIT(3)) enc |= BIT(3);
-        if (dec & BIT(4)) enc |= BIT(6);
-        if (dec & BIT(5)) enc |= BIT(7);
-        if (dec & BIT(6)) enc |= BIT(0);
-        if (dec & BIT(7)) enc |= BIT(2);
-        enc ^= 0x98;
+        if (dec & BIT(0)) enc |= BIT(6); // 64
+        if (dec & BIT(1)) enc |= BIT(2); // 4
+        if (dec & BIT(2)) enc |= BIT(7); // 128
+        if (dec & BIT(3)) enc |= BIT(3); // 8
+        if (dec & BIT(4)) enc |= BIT(1); // 2
+        if (dec & BIT(5)) enc |= BIT(0); // 1
+        if (dec & BIT(6)) enc |= BIT(4); // 16
+        if (dec & BIT(7)) enc |= BIT(6); // 64
+        enc ^= 0x2A;
         return enc;
     }
 
+    uint32_t readCartVersion() {
+        // send c5
+        memset(buf, 0, 6);
+        bool ret;
+
+        uint32_t x = ((c5 << 8) & 0xF00) | ((c5 >> 8) & 0xFF);
+        buf[0] = 0x56; // V
+        buf[1] = (x >> 4) & 0xFF;
+        buf[2] = 0x2E; // .
+        buf[3] = (x >> 4) & 0xFF;
+        buf[4] = x & 0x0F;
+        buf[5] = 0x00; // string end
+        ret = false;
+        if (buf[1] <= 9 && buf[3] <= 9 && buf[4] <= 9) {
+            buf[1] += 0x30;
+            buf[3] += 0x30;
+            buf[4] += 0x30;
+            ret = true;
+        }
+        return ret;
+    }
+
+    bool unlockCart() {
+        // send D0AA
+        // send D000
+        // send D0AA
+    }
+
     void erase_cmd(uint32_t address) {
+        // send D0..10
+        // block 0x10000 bytes
+        //
+        // block end is 0x200000
         uint8_t cmdbuf[8];
         logMessage(LOG_DEBUG, "R4SDHC: erase(0x%08x)", address);
         memcpy(cmdbuf, cmdEraseFlash, 8);
@@ -58,6 +92,8 @@ private:
     }
 
     void write_cmd(uint32_t address, uint8_t value) {
+        // send d4..30
+        // need encrypt?
         uint8_t cmdbuf[8];
         logMessage(LOG_DEBUG, "R4SDHC: write(0x%08x) = 0x%02x", address, value);
         memcpy(cmdbuf, cmdWriteByteFlash, 8);
@@ -113,6 +149,10 @@ public:
         return false;
     }
 };
+
+
+const uint8_t R4SDHC_DualCore::cmdUnkC0[8] = {0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+const uint8_t R4SDHC_DualCore::cmdCartVersion[8] = {0xC5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 const uint8_t R4SDHC_DualCore::cmdUnkD0AA[8] = {0xD0, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 const uint8_t R4SDHC_DualCore::cmdUnkD0[8] = {0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
