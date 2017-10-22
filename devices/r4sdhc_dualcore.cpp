@@ -81,6 +81,7 @@ private:
 
         // TODO: find IDB and get the latencies.
         sendCommand(cmdbuf, 0, nullptr, 0x50);
+        sendCommand(cmdUnkC0, 0, nullptr, 0x50);
     }
 
     void write_cmd(uint32_t address, uint8_t value) {
@@ -93,6 +94,7 @@ private:
         cmdbuf[4] = value;
 
         sendCommand(cmdbuf, 0, nullptr);
+        sendCommand(cmdUnkC0, 0, nullptr, 0x50);
     }
 
 public:
