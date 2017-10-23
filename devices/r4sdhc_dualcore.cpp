@@ -14,9 +14,9 @@ class R4SDHC_DualCore : Flashcart {
 private:
     static const uint8_t cmdEraseFlash[8];
     static const uint8_t cmdWriteByteFlash[8];
-
     static const uint8_t cmdUnkC0[8];
     static const uint8_t cmdCartVersion[8];
+    static const uint8_t cmdReadChipID[8];
     static const uint8_t cmdUnkD0AA[8];
     static const uint8_t cmdUnkD0[8];
 
@@ -59,6 +59,15 @@ private:
         sendCommand(cmdCartVersion, 4, (uint8_t*)(&version), 0x50);
         uint16_t ret = ((version << 8) & 0xFF00) | ((version >> 8) & 0xFF);
         logMessage(LOG_DEBUG, "R4SDHC: C5 %X(%X)", ret, version);
+        return ret;
+    }
+
+    uint16_t read_cart_id() {
+        uint32_t version;
+        sendCommand(cmdReadChipID, 4, (uint8_t*)(&version), 0x50);
+
+        uint16_t ret = ((version << 8) & 0xFF00) | ((version >> 8) & 0xFF);
+        logMessage(LOG_DEBUG, "R4SDHC: B8 %X(%X)", ret, version);
         return ret;
     }
 
@@ -167,6 +176,7 @@ const uint8_t R4SDHC_DualCore::cmdUnkD0AA[8] = {0xD0, 0xAA, 0x00, 0x00, 0x00, 0x
 const uint8_t R4SDHC_DualCore::cmdUnkD0[8] = {0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 //const uint8_t R4SDHC_DualCore::cmdReadFlash[8] = {0xB7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+const uint8_t R4SDHC_DualCore::cmdReadChipID[8] = {0xB8, 0xB8, 0xB8, 0xB8, 0xB8, 0xB8, 0xB8, 0xB8};
 const uint8_t R4SDHC_DualCore::cmdEraseFlash[8] = {0xD4, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00};
 const uint8_t R4SDHC_DualCore::cmdWriteByteFlash[8] = {0xD4, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00};
 
