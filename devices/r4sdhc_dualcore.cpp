@@ -49,7 +49,7 @@ private:
         if (dec & BIT(4)) enc |= BIT(1); // 2
         if (dec & BIT(5)) enc |= BIT(0); // 1
         if (dec & BIT(6)) enc |= BIT(4); // 16
-        if (dec & BIT(7)) enc |= BIT(6); // 64
+        if (dec & BIT(7)) enc |= BIT(5); // 32
         enc ^= 0x2A;
         return enc;
     }
